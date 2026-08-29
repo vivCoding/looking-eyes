@@ -662,8 +662,8 @@ Run:
 cd looking-eyes
 /mnt/d/projects/security-eyes/.venv/bin/python - <<'EOF'
 from gaze import Person, box_to_look
-p = Person(0.5, 0.5, 0.1, 0.2)
-x, y = box_to_look(p)                    # center -> 0,0
+p = Person(0.45, 0.45, 0.1, 0.2)
+x, y = box_to_look(p)                    # cx=0.5, head cy=0.5 -> 0,0
 assert abs(x) < 1e-6 and abs(y) < 1e-6
 p = Person(0.0, 0.0, 0.1, 0.2)
 x, y = box_to_look(p)                    # head near top-left -> look left+up
