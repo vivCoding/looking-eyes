@@ -6,6 +6,10 @@ boxes back, and moves cartoon eyes on the LCD to track the biggest person in
 frame — with last-spot memory, dart-y idle wandering, a 30 s backlight-off
 sleep, and a sleepy blink-open wake.
 
+**Raspberry Pi-only.** This app runs on the Pi driving the ST7789 LCD;
+`hardware.py` requires `luma.lcd` and `RPi.GPIO`, both installed from
+`requirements.txt`. There is no desktop preview mode.
+
 ## Hardware
 
 - Raspberry Pi (64-bit), camera, ST7789 320×240 SPI LCD (DC=25, RST=24,
@@ -22,16 +26,9 @@ sleep, and a sleepy blink-open wake.
 cd looking-eyes
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-# edit config.py: DISPLAY_KIND="st7789", MEDIAPIPE_SERVER_URL
+# edit config.py: MEDIAPIPE_SERVER_URL
 python main.py
 ```
-
-## Dev machine (sim mode)
-
-Keep `DISPLAY_KIND="sim"`; install `opencv-python` (GUI build) instead of
-`opencv-python-headless`. `python main.py` opens an OpenCV window showing
-what the LCD would show, plus the debug web view at
-`http://localhost:5000` (mirrored feed, tracked-person highlight, status).
 
 ## Behavior
 
@@ -57,6 +54,6 @@ geometry, and the web view toggle (`WEB_VIEW_ENABLED`).
 | `person_tracker.py` | WebRTC person tracker (thread-safe shared state) |
 | `gaze.py` | pure gaze/sleep/wake logic |
 | `eyes_renderer.py` | PIL eyes/mouth/blink rendering |
-| `hardware.py` | ST7789 + backlight (or sim window) glue |
+| `hardware.py` | ST7789 LCD + backlight GPIO glue (Pi-only) |
 | `web_view.py` | debug web page |
 | `main.py` | wiring + render loop |

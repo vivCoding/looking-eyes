@@ -56,7 +56,7 @@ Camera ──► PersonTracker (WebRTC) ──► mediapipe-server
 | `gaze.py`           | Pure logic, no hardware: person selection, box→look mapping, saccade wander, last-spot memory, wake/sleep state machine, timings.                                                                                               |
 | `eyes_renderer.py`  | PIL drawing lifted from `eyes_backlight.py` (eyes, pupils, mouth, blink), plus a `openness` param for the sleepy blink-open animation (0 = lid line, 1 = full open, intermediate = squashed oval).                              |
 | `web_view.py`       | Flask app: `/` HTML page, `/feed` MJPEG stream (mirrored feed + boxes + highlight on tracked person + status text), `/status` JSON (`persons`, gaze state, `look_x/y`, connection state).                                       |
-| `hardware.py`       | Thin glue: `init_display()`, `set_backlight(on)`, display power-on/power-off. Only file importing `luma`/`RPi.GPIO`. Supports a `DISPLAY_KIND = "sim"` mode rendering to an OpenCV window (manual testing without the Pi).      |
+| `hardware.py`       | Thin glue: `init_display()`, `set_backlight(on)`, display power-on/power-off. Only file importing `luma`/`RPi.GPIO`. Pi-only; requires luma + RPi.GPIO at import time.                                                                                                                   |
 | `main.py`           | Wires the threads, runs the render loop, handles KeyboardInterrupt shutdown (clear LCD, backlight off, `GPIO.cleanup()`).                                                                                                       |
 | `requirements.txt`  | aiortc, av, opencv-python-headless, httpx, flask, luma.lcd, pillow, RPi.GPIO.                                                                                                                                                   |
 | `README.md`         | Setup + run instructions on the Pi, config pointers.                                                                                                                                                                            |
@@ -107,8 +107,7 @@ similar-size people trade the biggest-box spot.
 
 Server/stream: `MEDIAPIPE_SERVER_URL` (default the demo's
 `http://10.0.0.22:8080`), `CAMERA_ID`, `RECONNECT_DELAY`, frames per sec.
-LCD/hardware: `WIDTH`, `HEIGHT`, `DISPLAY_KIND` (`st7789` | `sim`),
-`BL_PIN`, SPI pins/speed, rotation.
+LCD/hardware: `WIDTH`, `HEIGHT`, `BL_PIN`, SPI pins/speed, rotation.
 Look: `HEAD_FRACTION` / `TRACK_CENTER`, `INVERT_LOOK_X`, `LOOK_SMOOTHING`,
 `SACCADE_*`, `LAST_SPOT_DWELL`, `NO_PERSON_SLEEP`, `WAKE_DELAY`,
 `WAKE_OPEN`, edge-bias odds.

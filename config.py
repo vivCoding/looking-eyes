@@ -7,7 +7,6 @@ RECONNECT_DELAY = 3.0            # seconds between reconnect attempts
 RENDER_INTERVAL = 0.01           # main render-loop sleep (seconds)
 
 # --- LCD / hardware ---
-DISPLAY_KIND = "sim"             # "st7789" on the Pi, "sim" for dev machines
 WIDTH = 320
 HEIGHT = 240
 BL_PIN = 18                      # backlight GPIO (BCM)

@@ -1,7 +1,7 @@
 """looking-eyes entry point: wires WebRTC tracker + gaze + LCD render loop."""
 import time
 
-from config import DISPLAY_KIND, RENDER_INTERVAL
+from config import RENDER_INTERVAL
 from person_tracker import PersonTracker
 from gaze import GazeController
 from eyes_renderer import BlinkState, draw_eyes_image
@@ -10,7 +10,7 @@ from web_view import start_web_view
 
 
 def main() -> None:
-    display = Display(DISPLAY_KIND)
+    display = Display()
     tracker = PersonTracker()
     tracker.start()
     gaze = GazeController(time.monotonic())
