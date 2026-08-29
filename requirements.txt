@@ -1,0 +1,12 @@
+# Direct dependencies only — let pip resolve transitive deps per platform.
+# mediapipe constraints on arm64 need numpy<2, so numpy is intentionally
+# left unpinned here.
+opencv-python-headless>=4.8
+aiortc>=1.9
+av>=12
+httpx>=0.27
+flask>=3.1
+pillow>=10
+# LCD hardware (Pi only — imports guarded in hardware.py)
+luma.lcd>=2.16
+RPi.GPIO>=0.7.1
