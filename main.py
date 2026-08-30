@@ -1,4 +1,5 @@
 """looking-eyes entry point: wires WebRTC tracker + gaze + LCD render loop."""
+import logging
 import time
 
 from config import RENDER_INTERVAL
@@ -7,6 +8,11 @@ from gaze import GazeController
 from eyes_renderer import BlinkState, draw_eyes_image
 from hardware import Display
 from web_view import start_web_view
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 
 def main() -> None:
