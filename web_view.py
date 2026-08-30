@@ -17,11 +17,14 @@ font-family:monospace">
 <script>
 setInterval(async () => {
   const s = await (await fetch('/status')).json();
+  const p = s.perf || {};
   document.getElementById('st').textContent =
     'state=' + s.state +
     ' | look=' + s.look_x.toFixed(2) + ',' + s.look_y.toFixed(2) +
     ' | conn=' + s.connection_state +
-    ' | persons=' + s.num_persons + ' | tracked=' + s.tracked;
+    ' | persons=' + s.num_persons + ' | tracked=' + s.tracked +
+    ' | cam=' + (p.cam_fps ?? '-') + ' res=' + (p.resolution ?? '-') +
+    ' | results=' + (p.result_fps ?? '-') + ' codec=' + (p.codec ?? '-');
 }, 500);
 </script></body></html>"""
 
