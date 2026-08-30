@@ -117,6 +117,7 @@ def start_web_view(
                 "cy": round(gaze.tracked.cy, 3),
                 "area": round(gaze.tracked.area, 4),
             },
+            "perf": tracker.perf,
         })
 
     t = threading.Thread(target=lambda: app.run(host=host, port=port,

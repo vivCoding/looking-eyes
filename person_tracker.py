@@ -3,6 +3,7 @@ publishes person detections as shared state (thread-safe)."""
 import asyncio
 import json
 import logging
+import re
 import threading
 import time
 
@@ -17,6 +18,22 @@ from config import (
 )
 
 log = logging.getLogger("looking-eyes.tracker")
+
+
+def _sdp_video_codecs(sdp: str) -> list[str]:
+    """Collect codec names (e.g. VP8, H264) from the video m-line of an SDP."""
+    codecs: list[str] = []
+    in_video = False
+    for line in sdp.splitlines():
+        if line.startswith("m="):
+            in_video = line.split()[1] == "video"
+            continue
+        if not in_video:
+            continue
+        m = re.match(r"a=rtpmap:(\d+)\s+([^/]+)", line.strip())
+        if m:
+            codecs.append(m.group(2))
+    return codecs
 
 
 class CameraVideoTrack(VideoStreamTrack):
@@ -79,6 +96,9 @@ class PersonTracker:
         self._persons = []
         self._frame = None
         self._connection_state = "idle"
+        self._dc_count = 0
+        self._perf_codec = "unknown"
+        self._perf = {}
         self._loop = None
         self._thread = None
         self._pc = None
@@ -112,6 +132,15 @@ class PersonTracker:
             if state != self._connection_state:
                 self._connection_state = state
                 log.info("connection state -> %s", state)
+
+    def _set_perf(self, value: dict) -> None:
+        with self._lock:
+            self._perf = value
+
+    @property
+    def perf(self) -> dict:
+        with self._lock:
+            return dict(self._perf)
 
     # --- lifecycle ---
     def start(self) -> None:
@@ -192,6 +221,7 @@ class PersonTracker:
             except json.JSONDecodeError:
                 log.warning("malformed persons message ignored")
                 return
+            self._dc_count += 1
             self._set_persons(persons)
 
         offer = await pc.createOffer()
@@ -207,6 +237,7 @@ class PersonTracker:
             answer = RTCSessionDescription(
                 sdp=resp.json()["sdp"], type=resp.json()["type"])
             await pc.setRemoteDescription(answer)
+        self._perf_codec = ",".join(_sdp_video_codecs(answer.sdp)) or "unknown"
 
         for _ in range(50):
             if pc.iceConnectionState in ("connected", "completed"):
@@ -217,6 +248,9 @@ class PersonTracker:
 
         self._set_state("connected")
         try:
+            perf_last = time.monotonic()
+            last_frames = 0
+            last_dc = 0
             while self._running:
                 frame = camera_track.latest_frame
                 if frame is None:
@@ -224,5 +258,25 @@ class PersonTracker:
                     continue
                 self._set_frame(frame)
                 await asyncio.sleep(0.01)
+                now = time.monotonic()
+                if now - perf_last >= 5.0:
+                    elapsed = now - perf_last
+                    h, w = (frame.shape[:2] if frame is not None else (0, 0))
+                    cam_fps = (camera_track.frames_sent - last_frames) / elapsed
+                    result_fps = (self._dc_count - last_dc) / elapsed
+                    self._set_perf({
+                        "cam_fps": round(cam_fps, 1),
+                        "result_fps": round(result_fps, 1),
+                        "resolution": f"{w}x{h}",
+                        "codec": self._perf_codec,
+                        "connection_state": self._connection_state,
+                    })
+                    log.info(
+                        "perf: cam_fps=%.1f result_fps=%.1f res=%dx%d codec=%s",
+                        cam_fps, result_fps, w, h, self._perf_codec,
+                    )
+                    perf_last = now
+                    last_frames = camera_track.frames_sent
+                    last_dc = self._dc_count
         finally:
             await pc.close()
