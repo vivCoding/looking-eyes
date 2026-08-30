@@ -39,9 +39,9 @@ WAKE_BLINK_COUNT = 3             # rapid blinks played when waking up
 WAKE_BLINK_GAP = 0.15            # gap between wake-up blinks (s)
 
 # Saccade (dart-y) wander
-SACCADE_INTERVAL_MIN = 0.3
+SACCADE_INTERVAL_MIN = 0.5
 SACCADE_INTERVAL_MAX = 1.2
-SACCADE_DURATION = 0.06          # snappy ease-out time toward a wander target (s)
+SACCADE_DURATION = 0.4          # snappy ease-out time toward a wander target (s)
 SACCADE_EDGE_BIAS = 0.3          # chance a wander target lands on an edge
 SACCADE_REBLINK_CHANCE = 0.3     # chance of a micro-blink when a saccade lands
 
@@ -60,7 +60,7 @@ BROW_LIFT = 8                   # brows rise/lower with vertical gaze (px)
 BROW_LOOK_LIFT = 10             # brows lift with overall gaze magnitude (px)
 BROW_TILT = 7                   # brow slope change per unit horizontal gaze (px)
 BROW_SWAY = 6                  # inner brow ends sway apart/together with horizontal gaze (px)
-BROW_SIDE_LIFT = 7           # brow on the looked-toward side RISES (px, per unit gaze)
+BROW_SIDE_LIFT = 20           # brow on the looked-toward side RISES (px, per unit gaze)
 BROW_COUNTER_LIFT = 20        # brow on the opposite side lowers a little (px, per unit gaze)
 BLINK_REACH_X = 30             # horizontal reach of the >_< blink strokes (px)
 BLINK_REACH_Y = 12             # vertical half-height of the >_< blink strokes (px)
