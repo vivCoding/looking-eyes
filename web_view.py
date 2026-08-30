@@ -16,7 +16,6 @@ font-family:monospace">
 <div id="st">status…</div>
 <script>
 setInterval(async () => {
-  return;
   const s = await (await fetch('/status')).json();
   document.getElementById('st').textContent =
     'state=' + s.state +
