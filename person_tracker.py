@@ -11,7 +11,10 @@ import httpx
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from av import VideoFrame
 
-from config import MEDIAPIPE_SERVER_URL, CAMERA_ID, RECONNECT_DELAY
+from config import (
+    MEDIAPIPE_SERVER_URL, CAMERA_ID, RECONNECT_DELAY,
+    CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_FPS,
+)
 
 log = logging.getLogger("looking-eyes.tracker")
 
@@ -24,6 +27,14 @@ class CameraVideoTrack(VideoStreamTrack):
         self._cap = cv2.VideoCapture(camera_id)
         if not self._cap.isOpened():
             raise RuntimeError(f"Could not open camera {camera_id}")
+        # Cap resolution/fps: the Pi encodes in software, so a high-res default
+        # camera makes each frame expensive and delays the detection feed.
+        if CAMERA_WIDTH:
+            self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+        if CAMERA_HEIGHT:
+            self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        if CAMERA_FPS:
+            self._cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
         self._running = True
         self.latest_frame = None
         self.frames_sent = 0

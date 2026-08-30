@@ -6,6 +6,14 @@ CAMERA_ID = 0
 RECONNECT_DELAY = 3.0            # seconds between reconnect attempts
 RENDER_INTERVAL = 0.01           # main render-loop sleep (seconds)
 
+# --- Camera capture ---
+# The Pi encodes frames in software (aiortc), so capping resolution/fps keeps
+# encode cost low and results near-realtime; person detection is unaffected at
+# VGA resolutions. Set to 0 to leave the camera's own default.
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 25
+
 # --- LCD / hardware ---
 WIDTH = 320
 HEIGHT = 240
