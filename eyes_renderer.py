@@ -1,4 +1,11 @@
-"""PIL rendering of the cartoon eyes + mouth, plus the blink state machine."""
+"""PIL rendering of the line-art face + mouth, plus the blink state machine.
+
+Open eyes are single vertical line strokes that translate with the gaze
+(up to EYE_TRAVEL_X / EYE_TRAVEL_Y). Eyebrows keep a mild inward frown and
+tilt with the look direction. Blink/closed eyes form >_< angle brackets.
+The mouth is a neutral line that tilts opposite the gaze and grows with
+look deflection. Wake-up plays a rapid blink burst.
+"""
 import math
 import random
 
@@ -7,82 +14,75 @@ from PIL import Image, ImageDraw
 from config import (
     WIDTH, HEIGHT,
     LEFT_EYE_CENTER, RIGHT_EYE_CENTER,
-    EYE_RADIUS_X, EYE_RADIUS_Y, EYE_OUTLINE_WIDTH,
-    PUPIL_RADIUS_X, PUPIL_RADIUS_Y, PUPIL_MARGIN,
-    LID_LINE_WIDTH, LID_LINE_HALF_LENGTH,
+    EYE_LINE_LENGTH, EYE_LINE_WIDTH, EYE_TRAVEL_X, EYE_TRAVEL_Y,
+    BROW_Y, BROW_HALF_LENGTH, BROW_WIDTH, BROW_FROWN, BROW_LIFT, BROW_TILT,
+    BLINK_ARM,
     MOUTH_Y, MOUTH_HALF_LENGTH, MOUTH_LINE_WIDTH,
     MOUTH_TILT_DEGREES, MOUTH_GROW_MAX,
     BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX,
     BLINK_DURATION_MIN, BLINK_DURATION_MAX,
     DOUBLE_BLINK_GAP_MIN, DOUBLE_BLINK_GAP_MAX,
     DOUBLE_BLINK_CHANCE, TRIPLE_BLINK_CHANCE,
+    WAKE_BLINK_COUNT, WAKE_BLINK_GAP,
 )
 
 
-def clamp(value: float, minimum: float, maximum: float) -> float:
-    return max(minimum, min(maximum, value))
+def _eye_offsets(look_x: float, look_y: float) -> tuple[float, float]:
+    """Pixel offset of the eye strokes for a look direction."""
+    return look_x * EYE_TRAVEL_X, look_y * EYE_TRAVEL_Y
 
 
-def get_pupil_center(
-    eye_center: tuple[int, int],
-    look_x: float,
-    look_y: float,
-    openness: float = 1.0,
-) -> tuple[float, float]:
-    """Pupil position for a look direction, inside a squashed (open) eye."""
-    o = clamp(openness, 0.0, 1.0)
-    rx = EYE_RADIUS_X - PUPIL_RADIUS_X - PUPIL_MARGIN
-    ry = (EYE_RADIUS_Y - PUPIL_RADIUS_Y - PUPIL_MARGIN) * o
-    offset_x = look_x * rx
-    offset_y = look_y * ry
-    return eye_center[0] + offset_x, eye_center[1] + offset_y
+def _draw_brows(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
+    """Eyebrows: fixed inward frown, raised/lowered with vertical gaze, and
+    a slope shift with horizontal gaze (slight, expressive)."""
+    base_y = BROW_Y + look_y * BROW_LIFT          # look up -> brows rise
+    slope = BROW_FROWN + look_x * BROW_TILT       # inner end hangs lower
+    for cx, _cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
+        inner_dir = 1.0 if cx < WIDTH / 2 else -1.0   # toward the nose
+        inner_x = cx + inner_dir * BROW_HALF_LENGTH
+        outer_x = cx - inner_dir * BROW_HALF_LENGTH
+        inner_y = base_y + slope
+        outer_y = base_y - slope
+        draw.line((outer_x, outer_y, inner_x, inner_y), fill="white", width=BROW_WIDTH)
 
 
-def _draw_lid_lines(draw: ImageDraw.ImageDraw) -> None:
-    for x, y in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
-        draw.line(
-            (x - LID_LINE_HALF_LENGTH, y, x + LID_LINE_HALF_LENGTH, y),
-            fill="white",
-            width=LID_LINE_WIDTH,
-        )
+def _draw_eyes(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
+    """Open eyes: vertical line strokes that translate with the gaze."""
+    ox, oy = _eye_offsets(look_x, look_y)
+    half = EYE_LINE_LENGTH / 2.0
+    for cx, cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
+        x, y = cx + ox, cy + oy
+        draw.line((x, y - half, x, y + half), fill="white", width=EYE_LINE_WIDTH)
+
+
+def _draw_closed(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
+    """Closed eyes: >_< — left eye '>' (apex right), right eye '<' (apex left)."""
+    ox, oy = _eye_offsets(look_x, look_y)
+    for cx, cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
+        x, y = cx + ox, cy + oy
+        apex_x = x + BLINK_ARM if cx < WIDTH / 2 else x - BLINK_ARM
+        draw.line((x, y - BLINK_ARM, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
+        draw.line((x, y + BLINK_ARM, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
 
 
 def draw_eyes_image(
     look_x: float,
     look_y: float,
-    openness: float = 1.0,
+    closed: bool = False,
 ) -> Image.Image:
-    """Render one 320x240 frame of the eyes.
+    """Render one 320x240 frame of the line-art face.
 
-    openness 0.0 = shut (lid lines only, matching the standalone blink),
-    1.0 = fully open, intermediate = vertically squashed eye (waking).
+    closed=True draws the >_< blink (normal blinks and the wake burst);
+    otherwise open line-stroke eyes + eyebrows + mouth.
     """
     img = Image.new("RGB", (WIDTH, HEIGHT), "black")
     draw = ImageDraw.Draw(img)
 
-    o = clamp(openness, 0.0, 1.0)
-    if o <= 0.0:
-        _draw_lid_lines(draw)
-        # Mouth still reacts to gaze even with closed eyes (small).
-        _draw_mouth(draw, look_x, look_y)
-        return img
-
-    ry = EYE_RADIUS_Y * o
-    py = PUPIL_RADIUS_Y * o
-
-    for x, y in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
-        draw.ellipse(
-            (x - EYE_RADIUS_X, y - ry, x + EYE_RADIUS_X, y + ry),
-            fill="white",
-            outline="black",
-            width=EYE_OUTLINE_WIDTH,
-        )
-    for eye_center in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
-        px, pyc = get_pupil_center(eye_center, look_x, look_y, o)
-        draw.ellipse(
-            (px - PUPIL_RADIUS_X, pyc - py, px + PUPIL_RADIUS_X, pyc + py),
-            fill="black",
-        )
+    if closed:
+        _draw_closed(draw, look_x, look_y)
+    else:
+        _draw_brows(draw, look_x, look_y)
+        _draw_eyes(draw, look_x, look_y)
 
     _draw_mouth(draw, look_x, look_y)
     return img
@@ -144,3 +144,15 @@ class BlinkState:
         """Trigger an immediate blink (used for saccade micro-blinks)."""
         self.closed = True
         self.close_until = now + random.uniform(BLINK_DURATION_MIN, BLINK_DURATION_MAX)
+
+    def burst(self, now: float,
+              count: int = WAKE_BLINK_COUNT,
+              gap: float = WAKE_BLINK_GAP) -> None:
+        """Play `count` rapid blinks (wake-up sequence) starting immediately.
+
+        The remaining blinks follow via the cluster gap mechanism in update().
+        """
+        self.closed = True
+        self.close_until = now + random.uniform(BLINK_DURATION_MIN, BLINK_DURATION_MAX)
+        self.cluster_remaining = max(0, count - 1)
+        self.cluster_gap = gap

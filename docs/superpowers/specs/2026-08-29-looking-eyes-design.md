@@ -21,10 +21,10 @@ Combines two existing pieces:
 | Multiple people             | Track the **biggest bounding box** (largest area).                                                        |
 | No person in frame          | Hold **last known spot** for 5 s, then **dart-y random wander**.                                          |
 | No person for 30 s          | **Backlight off** (LCD black, render loop pauses). Clock runs **regardless of connection health** (Q4/B). |
-| Person appears while asleep | **Sleepy wake**: backlight on → eyes closed → slow **blink-open** over ~1 s → tracking.                   |
+| Person appears while asleep | **Wake**: backlight on → brief closed (`>_<`) → ~3 rapid blinks → tracking.                   |
 | Web view                    | Keep the demo's debug web view (camera + boxes + tracked highlight), **on by default, configurable off**. |
 | Testing                     | **Manual only.** No automated test suite.                                                                 |
-| Wander style                | Replace the deterministic cos/sin wander with random **saccades** (dart-y, unpredictable).                |
+| Wander style                | Replace the deterministic cos/sin wander with random **saccades** (dart-y, unpredictable, snappy ease-out ~0.06 s).                |
 
 ## Architecture
 
@@ -54,7 +54,7 @@ Camera ──► PersonTracker (WebRTC) ──► mediapipe-server
 | `config.py`         | Every knob (see below).                                                                                                                                                                                                         |
 | `person_tracker.py` | WebRTC client refactored from `remote_person_webrtc.py` into a `PersonTracker` class running in its own thread; exposes `latest_persons`, `latest_frame`, `connection_state` (thread-safe). Auto-reconnects on connection loss. |
 | `gaze.py`           | Pure logic, no hardware: person selection, box→look mapping, saccade wander, last-spot memory, wake/sleep state machine, timings.                                                                                               |
-| `eyes_renderer.py`  | PIL drawing lifted from `eyes_backlight.py` (eyes, pupils, mouth, blink), plus a `openness` param for the sleepy blink-open animation (0 = lid line, 1 = full open, intermediate = squashed oval).                              |
+| `eyes_renderer.py`  | PIL line-art face: translating eye strokes, frowning/tilting eyebrows, `>_<` blink/closed shapes, mouth, and the blink state machine (incl. wake burst).                              |
 | `web_view.py`       | Flask app: `/` HTML page, `/feed` MJPEG stream (mirrored feed + boxes + highlight on tracked person + status text), `/status` JSON (`persons`, gaze state, `look_x/y`, connection state).                                       |
 | `hardware.py`       | Thin glue: `init_display()`, `set_backlight(on)`, display power-on/power-off. Only file importing `luma`/`RPi.GPIO`. Pi-only; requires luma + RPi.GPIO at import time.                                                                                                                   |
 | `main.py`           | Wires the threads, runs the render loop, handles KeyboardInterrupt shutdown (clear LCD, backlight off, `GPIO.cleanup()`).                                                                                                       |
@@ -77,9 +77,9 @@ States, in priority order. `look_x/look_y ∈ [-1, 1]`.
 4. **ASLEEP** — `NO_PERSON_SLEEP = 30.0` s after the last detection (clock
    never pauses, per decision): backlight off, LCD black, render loop
    pauses, tracker keeps running.
-5. **WAKING** — on next detection: backlight on, eyes **closed** for
-   `WAKE_DELAY = 0.4` s, then openness eases 0→1 over `WAKE_OPEN = 1.0` s
-   (sleepy blink-open), then TRACKING.
+5. **WAKING** — on next detection: backlight on, a rapid blink burst
+   (`WAKE_BLINK_COUNT` = 3, `WAKE_BLINK_GAP` 0.15 s) plays via
+   `wake_pending`, then TRACKING after `WAKE_STATE_DURATION` (0.7 s).
 
 **Smoothing**: exponential moving average on the look target
 (`LOOK_SMOOTHING = 0.25` per frame, configurable) — softens flicker when two
@@ -98,9 +98,10 @@ similar-size people trade the biggest-box spot.
 
 - 320×240 portrait ST7789, `rotate=2`, SPI on the existing pins
   (DC=25, RST=24, `bus_speed_hz=40 MHz`), backlight `GPIO 18`.
-- Eye geometry, pupil offsets, lid lines, mouth tilt/grow behavior, blink
-  intervals/double/triple odds — copied verbatim into `config.py` +
-  `eyes_renderer.py`.
+- Line-art face: open eyes are vertical line strokes that translate with
+  the gaze; eyebrows keep an inward frown and tilt with the gaze; blinks
+  and the closed state draw `>_<` angle brackets; mouth tilt/grow
+  behavior and blink intervals/double/triple odds live in `config.py`.
 - Mouth keeps reacting to gaze (tilts opposite, grows with deflection).
 
 ## Config (`config.py`) — everything listed
@@ -109,9 +110,10 @@ Server/stream: `MEDIAPIPE_SERVER_URL` (default the demo's
 `http://10.0.0.22:8080`), `CAMERA_ID`, `RECONNECT_DELAY`, frames per sec.
 LCD/hardware: `WIDTH`, `HEIGHT`, `BL_PIN`, SPI pins/speed, rotation.
 Look: `HEAD_FRACTION` / `TRACK_CENTER`, `INVERT_LOOK_X`, `LOOK_SMOOTHING`,
-`SACCADE_*`, `LAST_SPOT_DWELL`, `NO_PERSON_SLEEP`, `WAKE_DELAY`,
-`WAKE_OPEN`, edge-bias odds.
-Eyes/mouth/blink: all geometry + timings from `eyes_backlight.py`.
+`SACCADE_*`, `LAST_SPOT_DWELL`, `NO_PERSON_SLEEP`, `WAKE_STATE_DURATION`,
+`WAKE_BLINK_COUNT`, `WAKE_BLINK_GAP`, edge-bias odds.
+Eyes/mouth/blink: line-art face geometry + blink interval/timing odds
+(see above).
 Web: `WEB_VIEW_ENABLED` (default True), `WEB_PORT`.
 
 ## Error handling
@@ -131,7 +133,7 @@ Web: `WEB_VIEW_ENABLED` (default True), `WEB_PORT`.
    stand in front of the camera.
 2. Person leaves: eyes hold the spot ~5 s, then dart around; after 30 s the
    backlight turns off.
-3. Person reappears: backlight on, sleepy blink-open (~1 s), then tracking.
+3. Person reappears: backlight on, rapid blink burst, then tracking.
 4. Mirror view in browser shows boxes with the tracked person highlighted;
    `/status` shows coherent state+liveness.
 5. Blinks/double-blinks and the mouth still behave like the standalone

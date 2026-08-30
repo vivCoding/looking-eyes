@@ -42,11 +42,12 @@ def main() -> None:
                 continue
 
             closed = blink.update(now)
+            if gaze.wake_pending:
+                blink.burst(now)      # rapid wake-up blinks
             if gaze.reblink:
                 blink.force(now)
 
-            openness = 0.0 if closed else gaze.openness
-            display.show(draw_eyes_image(gaze.look_x, gaze.look_y, openness))
+            display.show(draw_eyes_image(gaze.look_x, gaze.look_y, closed))
             time.sleep(RENDER_INTERVAL)
     except KeyboardInterrupt:
         print("\n[looking-eyes] shutting down")

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from config import (
     HEAD_FRACTION, TRACK_CENTER, INVERT_LOOK_X, LOOK_SMOOTHING,
-    LAST_SPOT_DWELL, NO_PERSON_SLEEP, WAKE_DELAY, WAKE_OPEN,
+    LAST_SPOT_DWELL, NO_PERSON_SLEEP, WAKE_STATE_DURATION,
     SACCADE_INTERVAL_MIN, SACCADE_INTERVAL_MAX, SACCADE_DURATION,
     SACCADE_EDGE_BIAS, SACCADE_REBLINK_CHANCE,
 )
@@ -142,7 +142,7 @@ class SaccadeWander:
         if landed and self._reblink_pending:
             self.reblink = True
             self._reblink_pending = False
-        t = self.phase * self.phase * (3.0 - 2.0 * self.phase)  # smoothstep
+        t = 1.0 - (1.0 - self.phase) ** 3  # ease-out: quick start, smooth settle
         self.pos = (
             self.start[0] + (self.target[0] - self.start[0]) * t,
             self.start[1] + (self.target[1] - self.start[1]) * t,
@@ -155,14 +155,14 @@ class GazeController:
 
     States: "tracking" | "last_spot" | "wander" | "asleep" | "waking".
     Attributes read by main.py / web_view.py:
-      state, look_x, look_y, openness, reblink, backlight_on, tracked, persons
+      state, look_x, look_y, reblink, backlight_on, tracked, persons, wake_pending
     """
 
     def __init__(self, now: float) -> None:
         self.state = "wander"
         self.look_x = 0.0
         self.look_y = 0.0
-        self.openness = 1.0
+        self.wake_pending = False
         self.reblink = False
         self.backlight_on = True
         self.tracked: Person | None = None
@@ -180,6 +180,7 @@ class GazeController:
         self.tracked = person
         self.persons = persons
         self.reblink = False
+        self.wake_pending = False
 
         if person is not None:
             self.last_detection_time = now
@@ -189,7 +190,8 @@ class GazeController:
 
             if self.state in ("asleep",):
                 self.state = "waking"
-                self.wake_until = now + WAKE_DELAY
+                self.wake_until = now + WAKE_STATE_DURATION
+                self.wake_pending = True   # main.py plays the blink burst once
             elif self.state == "waking":
                 pass  # wake timing handled below; keep tracking target
             else:
@@ -212,9 +214,9 @@ class GazeController:
         if now - self.last_detection_time > NO_PERSON_SLEEP:
             self.state = "asleep"
 
-        # Fill in per-state look/openness/reblink.
+        # Fill in per-state look/reblink.
         if self.state in ("tracking", "waking"):
-            pass  # look already set above; blinks override openness in renderer
+            pass  # look already set above; blink-closed state handled in renderer
         elif self.state == "last_spot":
             self.look_x, self.look_y = self.last_spot_look
         elif self.state == "wander":
@@ -224,16 +226,9 @@ class GazeController:
         elif self.state == "asleep":
             pass  # render loop pauses; values irrelevant
 
-        # Openness: 1.0 except during the sleepy wake ramp.
-        if self.state == "waking":
-            elapsed = now - (self.wake_until - WAKE_DELAY)
-            if elapsed < WAKE_DELAY:
-                self.openness = 0.0
-            else:
-                self.openness = min(1.0, (elapsed - WAKE_DELAY) / WAKE_OPEN)
-                if self.openness >= 1.0:
-                    self.state = "tracking"
-        else:
-            self.openness = 1.0
+        # Wake: backlight on, blink burst (driven by main.py via wake_pending),
+        # then start tracking once the wake window elapses.
+        if self.state == "waking" and now >= self.wake_until:
+            self.state = "tracking"
 
         self.backlight_on = self.state != "asleep"

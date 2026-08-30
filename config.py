@@ -34,27 +34,31 @@ LOOK_SMOOTHING = 0.25            # EMA factor per frame toward the look target
 # Last-spot / sleep / wake
 LAST_SPOT_DWELL = 5.0            # hold last known spot after person leaves (s)
 NO_PERSON_SLEEP = 10.0           # no person this long -> backlight off (s)
-WAKE_DELAY = 0.4                 # eyes stay closed when waking (s)
-WAKE_OPEN = 1.0                  # sleepy blink-open duration (s)
+WAKE_STATE_DURATION = 0.7        # how long the "waking" state shows before tracking (s)
+WAKE_BLINK_COUNT = 3             # rapid blinks played when waking up
+WAKE_BLINK_GAP = 0.15            # gap between wake-up blinks (s)
 
 # Saccade (dart-y) wander
 SACCADE_INTERVAL_MIN = 0.3
 SACCADE_INTERVAL_MAX = 1.2
-SACCADE_DURATION = 0.15          # ease-in-out time toward a wander target (s)
+SACCADE_DURATION = 0.06          # snappy ease-out time toward a wander target (s)
 SACCADE_EDGE_BIAS = 0.3          # chance a wander target lands on an edge
 SACCADE_REBLINK_CHANCE = 0.3     # chance of a micro-blink when a saccade lands
 
-# --- Eye / mouth geometry (copied from eyes_backlight.py) ---
+# --- Face geometry (line-art) ---
 LEFT_EYE_CENTER = (90, 120)
 RIGHT_EYE_CENTER = (230, 120)
-EYE_RADIUS_X = 50
-EYE_RADIUS_Y = 72
-EYE_OUTLINE_WIDTH = 8
-PUPIL_RADIUS_X = 16
-PUPIL_RADIUS_Y = 20
-PUPIL_MARGIN = 8
-LID_LINE_WIDTH = 5
-LID_LINE_HALF_LENGTH = 46
+EYE_LINE_LENGTH = 26            # open-eye stroke length (px)
+EYE_LINE_WIDTH = 5              # open-eye stroke width (px)
+EYE_TRAVEL_X = 24               # max horizontal stroke travel with gaze (px)
+EYE_TRAVEL_Y = 16               # max vertical stroke travel with gaze (px)
+BROW_Y = 82                     # eyebrow center line, above the eyes (px)
+BROW_HALF_LENGTH = 30           # brow stroke half-length (px)
+BROW_WIDTH = 6                  # brow stroke width (px)
+BROW_FROWN = 8                  # frown: inner brow end is this much lower (px)
+BROW_LIFT = 6                   # brows rise/lower with vertical gaze (px)
+BROW_TILT = 5                   # brow slope change per unit horizontal gaze (px)
+BLINK_ARM = 12                  # half-height of the >_< blink strokes (px)
 MOUTH_Y = 200
 MOUTH_HALF_LENGTH = 14
 MOUTH_LINE_WIDTH = 3
