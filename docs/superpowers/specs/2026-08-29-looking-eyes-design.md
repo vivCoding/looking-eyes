@@ -90,7 +90,7 @@ similar-size people trade the biggest-box spot.
 - Saccade every `SACCADE_INTERVAL_MIN..MAX = 0.3..1.2` s (random).
 - Target: uniform random point in [-1,1]², but ~30% of the time biased to an
   **edge/corner** (eyes scanning the room).
-- Ease-in-out toward the target over ~0.15 s, hold briefly, re-pick.
+- Snappy ease-out toward the target over ~0.06 s (`SACCADE_DURATION`), then hold briefly, re-pick.
 - Occasionally (config) **re-blink** right after a saccade lands, like real
   eyes micro-blink.
 
