@@ -19,13 +19,13 @@ DISPLAY_ROTATE = 2               # ST7789 rotation used by the standalone script
 
 # --- Look / gaze ---
 HEAD_FRACTION = 0.25             # look point = box.y + box.h * HEAD_FRACTION
-TRACK_CENTER = False             # True: look at box center instead of head point
+TRACK_CENTER = True              # True: look at box center instead of head point
 INVERT_LOOK_X = False            # flip horizontal look (reversed camera/LCD mount)
 LOOK_SMOOTHING = 0.25            # EMA factor per frame toward the look target
 
 # Last-spot / sleep / wake
 LAST_SPOT_DWELL = 5.0            # hold last known spot after person leaves (s)
-NO_PERSON_SLEEP = 30.0           # no person this long -> backlight off (s)
+NO_PERSON_SLEEP = 10.0           # no person this long -> backlight off (s)
 WAKE_DELAY = 0.4                 # eyes stay closed when waking (s)
 WAKE_OPEN = 1.0                  # sleepy blink-open duration (s)
 
