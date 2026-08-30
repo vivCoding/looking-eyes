@@ -18,6 +18,7 @@ from config import (
     BROW_Y, BROW_HALF_LENGTH, BROW_WIDTH, BROW_FROWN, BROW_LIFT,
     BROW_LOOK_LIFT, BROW_TILT,
     BROW_SWAY, BROW_SIDE_LIFT,
+    BROW_COUNTER_LIFT,
     BLINK_REACH_X, BLINK_REACH_Y,
     MOUTH_Y, MOUTH_HALF_LENGTH, MOUTH_LINE_WIDTH,
     MOUTH_TILT_DEGREES, MOUTH_GROW_MAX,
@@ -35,15 +36,20 @@ def _eye_offsets(look_x: float, look_y: float) -> tuple[float, float]:
 
 
 def _draw_brows(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
-    """Eyebrows: frown with the eyes, rise/lower with vertical gaze, and the
-    brow on the looked-toward side raises (looking right raises the right
-    brow). Inner ends sway with horizontal gaze."""
-    base_y = BROW_Y + look_y * BROW_LIFT - math.hypot(look_x, look_y) * BROW_LOOK_LIFT   # any gaze lifts, look up adds
+    """Eyebrows: frown with the eyes, rise/lower with vertical gaze, and
+    asymmetric side response to horizontal gaze: the brow on the looked-
+    toward side raises clearly, the opposite brow lowers a little."""
+    base_y = BROW_Y + look_y * BROW_LIFT - math.hypot(look_x, look_y) * BROW_LOOK_LIFT
     slope = BROW_FROWN + look_x * BROW_TILT       # inner end hangs lower
     sway = look_x * BROW_SWAY                     # inner ends sway with look_x
+    look_mag = abs(look_x)
+    look_side = 1.0 if look_x >= 0.0 else -1.0
     for cx, _cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
         inner_dir = 1.0 if cx < WIDTH / 2 else -1.0   # toward the nose
-        brow_y = base_y + inner_dir * look_x * BROW_SIDE_LIFT  # side you look toward raises
+        if look_side * inner_dir < 0.0:
+            brow_y = base_y - look_mag * BROW_SIDE_LIFT     # looked-toward brow raises
+        else:
+            brow_y = base_y + look_mag * BROW_COUNTER_LIFT  # opposite brow lowers a little
         inner_x = cx + inner_dir * BROW_HALF_LENGTH + sway
         outer_x = cx - inner_dir * BROW_HALF_LENGTH - sway
         inner_y = brow_y + slope
