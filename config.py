@@ -39,8 +39,8 @@ WAKE_BLINK_COUNT = 3             # rapid blinks played when waking up
 WAKE_BLINK_GAP = 0.15            # gap between wake-up blinks (s)
 WAKE_TRANSITION = 0.35       # after waking: saccade-ease from center to the person (s)
 SLEEP_SETTLE = 0.45          # pupils settle to center over this before backlight off (s)
-SLEEP_PAUSE = 0.3           # pause at center after settling, before backlight off (s)
-WAKE_LOOK_DELAY = 0.3       # delay after the wake phase before saccading to the person (s)
+SLEEP_PAUSE = 0.4           # pause at center after settling, before backlight off (s)
+WAKE_LOOK_DELAY = 0.4       # delay after the wake phase before saccading to the person (s)
 
 # Saccade (dart-y) wander
 SACCADE_INTERVAL_MIN = 0.5
