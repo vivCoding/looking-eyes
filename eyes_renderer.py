@@ -16,8 +16,8 @@ from config import (
     LEFT_EYE_CENTER, RIGHT_EYE_CENTER,
     EYE_LINE_LENGTH, EYE_LINE_WIDTH, EYE_TRAVEL_X, EYE_TRAVEL_Y,
     BROW_Y, BROW_HALF_LENGTH, BROW_WIDTH, BROW_FROWN, BROW_LIFT, BROW_TILT,
-    BROW_SWAY,
-    BLINK_ARM,
+    BROW_SWAY, BROW_SIDE_LIFT,
+    BLINK_REACH_X, BLINK_REACH_Y,
     MOUTH_Y, MOUTH_HALF_LENGTH, MOUTH_LINE_WIDTH,
     MOUTH_TILT_DEGREES, MOUTH_GROW_MAX,
     BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX,
@@ -34,17 +34,19 @@ def _eye_offsets(look_x: float, look_y: float) -> tuple[float, float]:
 
 
 def _draw_brows(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
-    """Eyebrows: frown with the eyes, rise/lower with vertical gaze, and sway
-    asymmetrically (inner ends shift opposite) with horizontal gaze."""
+    """Eyebrows: frown with the eyes, rise/lower with vertical gaze, and the
+    brow on the looked-toward side raises (looking right raises the right
+    brow). Inner ends sway with horizontal gaze."""
     base_y = BROW_Y + look_y * BROW_LIFT          # look up -> brows rise
     slope = BROW_FROWN + look_x * BROW_TILT       # inner end hangs lower
     sway = look_x * BROW_SWAY                     # inner ends sway with look_x
     for cx, _cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
         inner_dir = 1.0 if cx < WIDTH / 2 else -1.0   # toward the nose
+        brow_y = base_y + inner_dir * look_x * BROW_SIDE_LIFT  # side you look toward raises
         inner_x = cx + inner_dir * BROW_HALF_LENGTH + sway
         outer_x = cx - inner_dir * BROW_HALF_LENGTH - sway
-        inner_y = base_y + slope
-        outer_y = base_y - slope
+        inner_y = brow_y + slope
+        outer_y = brow_y - slope
         draw.line((outer_x, outer_y, inner_x, inner_y), fill="white", width=BROW_WIDTH)
 
 
@@ -58,13 +60,13 @@ def _draw_eyes(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
 
 
 def _draw_closed(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
-    """Closed eyes: >_< — left eye '>' (apex right), right eye '<' (apex left)."""
+    """Closed eyes: long flat >_< — left eye '>' (apex right), right '<'."""
     ox, oy = _eye_offsets(look_x, look_y)
     for cx, cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
         x, y = cx + ox, cy + oy
-        apex_x = x + BLINK_ARM if cx < WIDTH / 2 else x - BLINK_ARM
-        draw.line((x, y - BLINK_ARM, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
-        draw.line((x, y + BLINK_ARM, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
+        apex_x = x + BLINK_REACH_X if cx < WIDTH / 2 else x - BLINK_REACH_X
+        draw.line((x, y - BLINK_REACH_Y, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
+        draw.line((x, y + BLINK_REACH_Y, apex_x, y), fill="white", width=EYE_LINE_WIDTH)
 
 
 def draw_eyes_image(
