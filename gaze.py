@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from config import (
     HEAD_FRACTION, TRACK_CENTER, INVERT_LOOK_X, LOOK_SMOOTHING,
     LAST_SPOT_DWELL, NO_PERSON_SLEEP, WAKE_STATE_DURATION,
-    WAKE_TRANSITION, SLEEP_SETTLE,
+    WAKE_TRANSITION, SLEEP_SETTLE, SLEEP_PAUSE, WAKE_LOOK_DELAY,
     SACCADE_INTERVAL_MIN, SACCADE_INTERVAL_MAX, SACCADE_DURATION,
     SACCADE_EDGE_BIAS, SACCADE_REBLINK_CHANCE,
 )
@@ -172,6 +172,7 @@ class GazeController:
         self.last_detection_time = now   # so startup doesn't sleep immediately
         self.last_spot_look = (0.0, 0.0)
         self.wake_until = 0.0
+        self._close_at = 0.0      # end of the closing pause at center
         self.smoother = LookSmoother(LOOK_SMOOTHING)
         self.wander = SaccadeWander()
         self._transition: tuple | None = None   # (start_x, start_y, tx, ty, t0, dur)
@@ -218,7 +219,7 @@ class GazeController:
 
             if self.state in ("asleep",):
                 self.state = "waking"
-                self.wake_until = now + WAKE_STATE_DURATION
+                self.wake_until = now + WAKE_STATE_DURATION + WAKE_LOOK_DELAY   # wake phase + pause
                 self.wake_pending = True   # main.py plays the blink burst once
             elif self.state == "waking":
                 pass  # wake timing handled below; keep tracking target
@@ -266,14 +267,15 @@ class GazeController:
             trans = self._advance_transition(now)
             if trans is not None:
                 self.look_x, self.look_y = trans  # settling toward center
-            else:
-                self.state = "asleep"             # centered -> backlight off
+                self._close_at = now + SLEEP_PAUSE
+            elif now >= self._close_at:
+                self.state = "asleep"             # paused at center -> backlight off
         elif self.state == "asleep":
             pass  # render loop pauses; values irrelevant
 
         # Wake: backlight on, blink burst (driven by main.py via wake_pending),
-        # pupils centered; once the wake window elapses, saccade toward the
-        # tracked person instead of snapping.
+        # pupils centered; after the wake phase + WAKE_LOOK_DELAY pause, saccade
+        # toward the tracked person instead of snapping.
         if self.state == "waking" and now >= self.wake_until:
             self.state = "tracking"
             if self.tracked is not None:

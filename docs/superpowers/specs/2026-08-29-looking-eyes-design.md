@@ -20,8 +20,8 @@ Combines two existing pieces:
 | --------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Multiple people             | Track the **biggest bounding box** (largest area).                                                        |
 | No person in frame          | Hold **last known spot** for 5 s, then **dart-y random wander**.                                          |
-| No person for 30 s          | Pupils **settle to center** (`SLEEP_SETTLE` 0.45 s), then **backlight off** (LCD black, render loop pauses). Clock runs **regardless of connection health** (Q4/B). |
-| Person appears while asleep | **Wake**: backlight on → pupils centered through the blink burst → saccade from center to the person (`WAKE_TRANSITION` 0.35 s), then tracking.                   |
+| No person for 30 s          | Pupils **settle to center** (`SLEEP_SETTLE` 0.45 s), pause (`SLEEP_PAUSE` 0.3 s), then **backlight off** (LCD black, render loop pauses). Clock runs **regardless of connection health** (Q4/B). |
+| Person appears while asleep | **Wake**: backlight on → pupils centered through the blink burst (`WAKE_STATE_DURATION`) → short pause (`WAKE_LOOK_DELAY` 0.3 s) → saccade from center to the person (`WAKE_TRANSITION` 0.35 s), then tracking. |
 | Web view                    | Keep the demo's debug web view (camera + boxes + tracked highlight), **on by default, configurable off**. |
 | Testing                     | **Manual only.** No automated test suite.                                                                 |
 | Wander style                | Replace the deterministic cos/sin wander with random **saccades** (dart-y, unpredictable, snappy ease-out ~0.06 s).                |
@@ -79,10 +79,12 @@ States, in priority order. `look_x/look_y ∈ [-1, 1]`.
    pauses, tracker keeps running.
 5. **WAKING** — on next detection: backlight on, pupils centered (0,0)
    through a rapid blink burst (`WAKE_BLINK_COUNT` = 3, `WAKE_BLINK_GAP`
-   0.15 s) via `wake_pending`; after `WAKE_STATE_DURATION` (0.7 s) the
-   gaze saccades center→person over `WAKE_TRANSITION` (0.35 s) — no snap.
+   0.15 s) via `wake_pending`; after `WAKE_STATE_DURATION` (0.7 s) plus a
+   `WAKE_LOOK_DELAY` (0.3 s) pause, the gaze saccades center→person over
+   `WAKE_TRANSITION` (0.35 s) — no snap.
 6. **CLOSING** — when no person for `NO_PERSON_SLEEP`: gaze settles to
-   center over `SLEEP_SETTLE` (0.45 s), then ASLEEP (backlight off).
+   center over `SLEEP_SETTLE` (0.45 s), pauses `SLEEP_PAUSE` (0.3 s),
+   then ASLEEP (backlight off).
 
 **Smoothing**: exponential moving average on the look target
 (`LOOK_SMOOTHING = 0.25` per frame, configurable) — softens flicker when two
