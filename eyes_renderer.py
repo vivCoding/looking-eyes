@@ -16,6 +16,7 @@ from config import (
     LEFT_EYE_CENTER, RIGHT_EYE_CENTER,
     EYE_LINE_LENGTH, EYE_LINE_WIDTH, EYE_TRAVEL_X, EYE_TRAVEL_Y,
     BROW_Y, BROW_HALF_LENGTH, BROW_WIDTH, BROW_FROWN, BROW_LIFT, BROW_TILT,
+    BROW_SWAY,
     BLINK_ARM,
     MOUTH_Y, MOUTH_HALF_LENGTH, MOUTH_LINE_WIDTH,
     MOUTH_TILT_DEGREES, MOUTH_GROW_MAX,
@@ -33,14 +34,15 @@ def _eye_offsets(look_x: float, look_y: float) -> tuple[float, float]:
 
 
 def _draw_brows(draw: ImageDraw.ImageDraw, look_x: float, look_y: float) -> None:
-    """Eyebrows: fixed inward frown, raised/lowered with vertical gaze, and
-    a slope shift with horizontal gaze (slight, expressive)."""
+    """Eyebrows: frown with the eyes, rise/lower with vertical gaze, and sway
+    asymmetrically (inner ends shift opposite) with horizontal gaze."""
     base_y = BROW_Y + look_y * BROW_LIFT          # look up -> brows rise
     slope = BROW_FROWN + look_x * BROW_TILT       # inner end hangs lower
+    sway = look_x * BROW_SWAY                     # inner ends sway with look_x
     for cx, _cy in [LEFT_EYE_CENTER, RIGHT_EYE_CENTER]:
         inner_dir = 1.0 if cx < WIDTH / 2 else -1.0   # toward the nose
-        inner_x = cx + inner_dir * BROW_HALF_LENGTH
-        outer_x = cx - inner_dir * BROW_HALF_LENGTH
+        inner_x = cx + inner_dir * BROW_HALF_LENGTH + sway
+        outer_x = cx - inner_dir * BROW_HALF_LENGTH - sway
         inner_y = base_y + slope
         outer_y = base_y - slope
         draw.line((outer_x, outer_y, inner_x, inner_y), fill="white", width=BROW_WIDTH)
