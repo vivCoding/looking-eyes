@@ -37,6 +37,8 @@ NO_PERSON_SLEEP = 10.0           # no person this long -> backlight off (s)
 WAKE_STATE_DURATION = 0.7        # how long the "waking" state shows before tracking (s)
 WAKE_BLINK_COUNT = 3             # rapid blinks played when waking up
 WAKE_BLINK_GAP = 0.15            # gap between wake-up blinks (s)
+WAKE_TRANSITION = 0.35       # after waking: saccade-ease from center to the person (s)
+SLEEP_SETTLE = 0.45          # pupils settle to center over this before backlight off (s)
 
 # Saccade (dart-y) wander
 SACCADE_INTERVAL_MIN = 0.3

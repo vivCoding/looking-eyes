@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from config import (
     HEAD_FRACTION, TRACK_CENTER, INVERT_LOOK_X, LOOK_SMOOTHING,
     LAST_SPOT_DWELL, NO_PERSON_SLEEP, WAKE_STATE_DURATION,
+    WAKE_TRANSITION, SLEEP_SETTLE,
     SACCADE_INTERVAL_MIN, SACCADE_INTERVAL_MAX, SACCADE_DURATION,
     SACCADE_EDGE_BIAS, SACCADE_REBLINK_CHANCE,
 )
@@ -153,7 +154,7 @@ class SaccadeWander:
 class GazeController:
     """State machine driving gaze + sleep/wake.
 
-    States: "tracking" | "last_spot" | "wander" | "asleep" | "waking".
+    States: "tracking" | "last_spot" | "wander" | "asleep" | "waking" | "closing".
     Attributes read by main.py / web_view.py:
       state, look_x, look_y, reblink, backlight_on, tracked, persons, wake_pending
     """
@@ -173,6 +174,33 @@ class GazeController:
         self.wake_until = 0.0
         self.smoother = LookSmoother(LOOK_SMOOTHING)
         self.wander = SaccadeWander()
+        self._transition: tuple | None = None   # (start_x, start_y, tx, ty, t0, dur)
+
+    def _start_transition(
+        self,
+        target: tuple[float, float],
+        now: float,
+        duration: float,
+        start: tuple[float, float] | None = None,
+    ) -> None:
+        """Begin an ease-out transition of the look from `start` (default: the
+        current look) to `target` over `duration` seconds."""
+        sx, sy = (self.look_x, self.look_y) if start is None else start
+        tx, ty = target
+        self._transition = (sx, sy, tx, ty, now, duration)
+
+    def _advance_transition(self, now: float) -> tuple[float, float] | None:
+        """Return the eased look while a transition is active; on completion
+        clear it and return the final target; else None."""
+        if self._transition is None:
+            return None
+        sx, sy, tx, ty, t0, dur = self._transition
+        if now >= t0 + dur:
+            self._transition = None
+            return tx, ty
+        p = (now - t0) / dur
+        t = 1.0 - (1.0 - p) ** 3   # ease-out, same as saccade wander
+        return sx + (tx - sx) * t, sy + (ty - sy) * t
 
     def update(self, now: float, dt: float, raw_persons) -> None:
         persons = parse_persons(raw_persons)
@@ -194,6 +222,9 @@ class GazeController:
                 self.wake_pending = True   # main.py plays the blink burst once
             elif self.state == "waking":
                 pass  # wake timing handled below; keep tracking target
+            elif self.state == "closing":
+                self.state = "tracking"
+                self._transition = None    # abort the settle-to-center transition
             else:
                 self.state = "tracking"
         else:
@@ -202,6 +233,8 @@ class GazeController:
                 pass  # stay asleep; clock keeps counting
             elif self.state == "waking":
                 self.state = "last_spot"   # abort the wake
+            elif self.state == "closing":
+                pass  # keep settling to center
             elif self.state in ("tracking", "last_spot"):
                 if now - self.last_detection_time > LAST_SPOT_DWELL:
                     self.state = "wander"
@@ -211,24 +244,42 @@ class GazeController:
                 self.state = "wander"
 
         # Sleep clock (never pauses, per design).
-        if now - self.last_detection_time > NO_PERSON_SLEEP:
-            self.state = "asleep"
+        if now - self.last_detection_time > NO_PERSON_SLEEP and self.state != "asleep":
+            if self.state != "closing":
+                self.state = "closing"
+                self._start_transition((0.0, 0.0), now, SLEEP_SETTLE)  # settle to center
 
         # Fill in per-state look/reblink.
-        if self.state in ("tracking", "waking"):
-            pass  # look already set above; blink-closed state handled in renderer
+        if self.state == "waking":
+            self.look_x, self.look_y = 0.0, 0.0   # pupils centered while waking
+        elif self.state == "tracking":
+            trans = self._advance_transition(now)
+            if trans is not None:
+                self.look_x, self.look_y = trans  # saccade toward the person
         elif self.state == "last_spot":
             self.look_x, self.look_y = self.last_spot_look
         elif self.state == "wander":
             (wx, wy), reblink = self.wander.update(now, dt)
             self.look_x, self.look_y = _clamp(wx, -1.0, 1.0), _clamp(wy, -1.0, 1.0)
             self.reblink = reblink
+        elif self.state == "closing":
+            trans = self._advance_transition(now)
+            if trans is not None:
+                self.look_x, self.look_y = trans  # settling toward center
+            else:
+                self.state = "asleep"             # centered -> backlight off
         elif self.state == "asleep":
             pass  # render loop pauses; values irrelevant
 
         # Wake: backlight on, blink burst (driven by main.py via wake_pending),
-        # then start tracking once the wake window elapses.
+        # pupils centered; once the wake window elapses, saccade toward the
+        # tracked person instead of snapping.
         if self.state == "waking" and now >= self.wake_until:
             self.state = "tracking"
+            if self.tracked is not None:
+                tx, ty = box_to_look(self.tracked)
+                self.smoother.reset()
+                self._start_transition((tx, ty), now, WAKE_TRANSITION,
+                                       start=(0.0, 0.0))
 
         self.backlight_on = self.state != "asleep"
